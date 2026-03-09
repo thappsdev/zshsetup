@@ -1,7 +1,6 @@
 # 🚀 Ultimate Terminal & Linux Master Cheat Sheet
 
 Tento dokument je tvůj kompletní průvodce moderním Zsh prostředím, správou Linuxu, Gitem a pokročilými nástroji jako Vim a Tmux.
-
 ---
 
 ## 🛠️ 1. Moderní Zsh Setup (Tvé nové prostředí)
