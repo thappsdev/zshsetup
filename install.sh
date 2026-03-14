@@ -83,5 +83,49 @@ echo -e "🚀 AFTER INSTALLING FONTS, RESTART WINDOWS TERMINAL"
 echo -e "   And set 'MesloLGS NF' in Profile -> Appearance -> Font face"
 echo -e "--------------------------------------------------------"
 
+# 9. Install VS Code Extensions
+echo -e "\n📦 Installing VS Code extensions..."
+if command -v code &> /dev/null; then
+    extensions=(
+        # Python / FastAPI
+        "ms-python.python"
+        "ms-python.vscode-pylance"
+        "charliermarsh.ruff"
+        
+        # Next.js / React / TypeScript / Tailwind
+        "esbenp.prettier-vscode"
+        "dbaeumer.vscode-eslint"
+        "bradlc.vscode-tailwindcss"
+        "dsznajder.es7-react-js-snippets" # React snippets (rfce, tsrfc)
+        "formulahendry.auto-rename-tag"  # Auto rename HTML/JSX tags
+        "yoavbls.pretty-ts-errors"       # Better readable TS errors
+        
+        # Databases (Postgres, MySQL, SQLite, MongoDB, Redis)
+        "mtxr.sqltools"
+        "mtxr.sqltools-driver-pg"
+        "mtxr.sqltools-driver-mysql"
+        "mtxr.sqltools-driver-sqlite"
+        "mongodb.mongodb-vscode"
+        "cweijan.vscode-redis-client"
+        
+        # Docker
+        "ms-azuretools.vscode-docker"
+        
+        # AI Assistants
+        "RooVeterinaryInc.roo-cline" # Roo Code
+        "Continue.continue"          # Continue
+        "GoogleCloudTools.gemini-codeassist" # Gemini Code Assist
+        # "Codeium.codeium"          # Alternativa k AI, pokud byl Kilo Code překlep pro Codeium/Cody
+    )
+
+    for ext in "${extensions[@]}"; do
+        code --install-extension "$ext" --force
+    done
+    echo "✅ VS Code extensions installed."
+else
+    echo "⚠️ Command 'code' not found. VS Code extensions were skipped."
+    echo "   To install them automatically, run this script inside VS Code's integrated terminal."
+fi
+
 # Launch Zsh
 exec zsh
