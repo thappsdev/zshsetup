@@ -39,7 +39,23 @@ GIT_CUSTOM="$HOME/.oh-my-zsh/custom"
 [ ! -d "$GIT_CUSTOM/plugins/zsh-syntax-highlighting" ] && git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$GIT_CUSTOM/plugins/zsh-syntax-highlighting"
 [ ! -d "$GIT_CUSTOM/plugins/fzf-tab" ] && git clone https://github.com/Aloxaf/fzf-tab "$GIT_CUSTOM/plugins/fzf-tab"
 
-# 7. Reconstruct .zshrc
+# 7. Install NVM, Node.js & Gemini CLI
+if [ ! -d "$HOME/.nvm" ]; then
+    echo "📦 Installing NVM (Node Version Manager)..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    
+    # Load NVM for the current session to install Node
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    
+    echo "🟢 Installing Node.js (LTS)..."
+    nvm install --lts
+    
+    echo "♊ Installing Gemini CLI..."
+    npm install -g @google/gemini-cli
+fi
+
+# 8. Reconstruct .zshrc
 echo "⚙️  Configuring .zshrc..."
 cat << 'EOF' > ~/.zshrc
 export ZSH="$HOME/.oh-my-zsh"
@@ -64,10 +80,15 @@ export PATH="$HOME/.local/bin:$HOME/.atuin/bin:$PATH"
 eval "$(atuin init zsh)"
 eval "$(zoxide init zsh)"
 
+# NVM initialization
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 EOF
 
-# 8. Set Zsh as default shell
+# 9. Set Zsh as default shell
 echo "🐚 Setting Zsh as default shell..."
 sudo chsh -s $(which zsh) $USER
 
@@ -83,7 +104,7 @@ echo -e "🚀 AFTER INSTALLING FONTS, RESTART WINDOWS TERMINAL"
 echo -e "   And set 'MesloLGS NF' in Profile -> Appearance -> Font face"
 echo -e "--------------------------------------------------------"
 
-# 9. Install VS Code Extensions
+# 10. Install VS Code Extensions
 echo -e "\n📦 Installing VS Code extensions..."
 if command -v code &> /dev/null; then
     extensions=(
