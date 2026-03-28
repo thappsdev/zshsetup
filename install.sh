@@ -18,6 +18,23 @@ section() { echo -e "\n${BLUE}━━━━━━━━━━━━━━━━�
             echo -e "${BLUE}  $1${NC}"; \
             echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; }
 
+# --- Detect OS & architecture ---
+ARCH=$(uname -m)   # x86_64 | aarch64 | armv7l
+DISTRO_ID=$(. /etc/os-release && echo "$ID")          # ubuntu | debian | raspbian
+DISTRO_VER=$(. /etc/os-release && echo "$VERSION_CODENAME" 2>/dev/null || echo "")
+IS_RASPBERRY=false
+[[ -f /proc/device-tree/model ]] && grep -qi "raspberry" /proc/device-tree/model 2>/dev/null && IS_RASPBERRY=true
+
+# dpkg arch string used for binary downloads
+case "$ARCH" in
+    x86_64)  DEB_ARCH="amd64"  ; RUST_ARCH="x86_64-unknown-linux-gnu"   ;;
+    aarch64) DEB_ARCH="arm64"  ; RUST_ARCH="aarch64-unknown-linux-gnu"  ;;
+    armv7l)  DEB_ARCH="armhf"  ; RUST_ARCH="armv7-unknown-linux-gnueabihf" ;;
+    *)       DEB_ARCH="amd64"  ; RUST_ARCH="x86_64-unknown-linux-gnu"   ;;
+esac
+
+info "Detected: $DISTRO_ID $DISTRO_VER | arch: $ARCH ($DEB_ARCH) | RPi: $IS_RASPBERRY"
+
 # --- Detect environment ---
 IS_PRODUCTION=false
 IS_DEVEL=false
@@ -44,7 +61,6 @@ sudo apt install -y \
     zsh git curl wget unzip \
     fzf fd-find bat \
     ripgrep \
-    tldr \
     htop \
     jq \
     tree \
@@ -60,13 +76,26 @@ log "Core packages installed"
 section "2/10 eza (modern ls)"
 
 if ! command -v eza &> /dev/null; then
-    info "Adding eza repository..."
-    sudo mkdir -p /etc/apt/keyrings
-    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
-        | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg 2>/dev/null
-    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
-        | sudo tee /etc/apt/sources.list.d/gierens.list > /dev/null
-    sudo apt update -q && sudo apt install -y eza
+    # Try apt repo first (works on x86_64 / amd64)
+    if [[ "$DEB_ARCH" == "amd64" ]]; then
+        info "Adding eza apt repository (amd64)..."
+        sudo mkdir -p /etc/apt/keyrings
+        wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
+            | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg 2>/dev/null
+        echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
+            | sudo tee /etc/apt/sources.list.d/gierens.list > /dev/null
+        sudo apt update -q && sudo apt install -y eza
+    else
+        # ARM / aarch64: download binary directly from GitHub releases
+        info "Installing eza via GitHub release binary (arch: $RUST_ARCH)..."
+        EZA_VERSION=$(curl -s https://api.github.com/repos/eza-community/eza/releases/latest \
+            | grep '"tag_name"' | cut -d'"' -f4)
+        wget -qO /tmp/eza.tar.gz \
+            "https://github.com/eza-community/eza/releases/download/${EZA_VERSION}/eza_${RUST_ARCH}.tar.gz"
+        tar -xzf /tmp/eza.tar.gz -C /tmp
+        sudo mv /tmp/eza /usr/local/bin/
+        rm -f /tmp/eza.tar.gz
+    fi
     log "eza installed"
 else
     info "eza already installed: $(eza --version | head -1)"
@@ -104,16 +133,10 @@ section "5/10 dust (disk usage)"
 if ! command -v dust &> /dev/null; then
     DUST_VERSION=$(curl -s https://api.github.com/repos/bootandy/dust/releases/latest \
         | grep '"tag_name"' | cut -d'"' -f4)
-    ARCH=$(dpkg --print-architecture)
-    if [[ "$ARCH" == "amd64" ]]; then
-        DUST_ARCH="x86_64-unknown-linux-gnu"
-    else
-        DUST_ARCH="aarch64-unknown-linux-gnu"
-    fi
     wget -qO /tmp/dust.tar.gz \
-        "https://github.com/bootandy/dust/releases/download/${DUST_VERSION}/dust-${DUST_VERSION}-${DUST_ARCH}.tar.gz"
+        "https://github.com/bootandy/dust/releases/download/${DUST_VERSION}/dust-${DUST_VERSION}-${RUST_ARCH}.tar.gz"
     tar -xzf /tmp/dust.tar.gz -C /tmp
-    sudo mv /tmp/dust-${DUST_VERSION}-${DUST_ARCH}/dust /usr/local/bin/
+    sudo mv /tmp/dust-${DUST_VERSION}-${RUST_ARCH}/dust /usr/local/bin/
     rm -rf /tmp/dust*
     log "dust installed"
 else
@@ -128,8 +151,13 @@ section "6/10 lazygit (TUI for git)"
 if ! command -v lazygit &> /dev/null; then
     LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" \
         | grep '"tag_name"' | cut -d'"' -f4 | sed 's/v//')
+    case "$ARCH" in
+        aarch64) LG_ARCH="arm64"  ;;
+        armv7l)  LG_ARCH="armv6"  ;;
+        *)       LG_ARCH="x86_64" ;;
+    esac
     curl -sLo /tmp/lazygit.tar.gz \
-        "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+        "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_${LG_ARCH}.tar.gz"
     tar -xzf /tmp/lazygit.tar.gz -C /tmp lazygit
     sudo mv /tmp/lazygit /usr/local/bin/
     rm /tmp/lazygit.tar.gz
@@ -191,10 +219,11 @@ if [ ! -d "$HOME/.nvm" ]; then
     info "Installing Node.js LTS..."
     nvm install --lts
 
-    info "Installing Gemini CLI..."
+    info "Installing global npm packages..."
     npm install -g @google/gemini-cli
+    npm install -g tldr
 
-    log "NVM + Node.js + Gemini CLI installed"
+    log "NVM + Node.js + global packages installed"
 else
     info "NVM already installed"
 fi
@@ -308,6 +337,7 @@ alias ports='ss -tulpn'
 alias myip='curl -s ifconfig.me'
 alias reload='source ~/.zshrc'
 alias zshconfig='${EDITOR:-nano} ~/.zshrc'
+alias tldr='tldr'   # installed via npm (needs nvm loaded)
 
 # =============================================================================
 # FZF configuration
